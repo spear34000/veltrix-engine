@@ -1,0 +1,27 @@
+{
+  "version": "1.0",
+  "added_tokens": [
+    {"id": 0, "content": "<unk>", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false},
+    {"id": 1, "content": "bos", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false},
+    {"id": 2, "content": "eos", "single_word": false, "lstrip": false, "rstrip": false, "normalized": false}
+  ],
+  "pre_tokenizer": {
+    "type": "ByteLevel",
+    "add_prefix_space": false,
+    "trim_offsets": false
+  },
+  "model": {
+    "type": "BPE",
+    "unk_token": "<unk>",
+    "vocab": {
+      "<unk>": 0, "bos": 1, "eos": 2, "h": 3, "e": 4, "l": 5, "o": 6, "w": 7,
+      "r": 8, "d": 9, " ": 10, "he": 11, "el": 12, "lo": 13, "wo": 14, "or": 15,
+      "ld": 16, "hel": 17, "wor": 18, "hello": 19, "world": 20,
+      "x": 21, "y": 22, "z": 23
+    },
+    "merges": [
+      "3 4", "4 5", "5 6", "7 6", "5 9", "11 5", "14 8", "17 13",
+      "18 16"
+    ]
+  }
+}

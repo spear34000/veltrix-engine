@@ -1,0 +1,14 @@
+build/
+.tmp_ggml/
+*.exe
+*.obj
+*.pdb
+*.ilk
+*.log
+*.tmp
+*.gguf
+output.txt
+benchmark_output.txt
+debug.txt
+debug_out.txt
+e2e_output.txt

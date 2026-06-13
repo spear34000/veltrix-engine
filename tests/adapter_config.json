@@ -1,0 +1,17 @@
+{
+  "r": 4,
+  "lora_alpha": 8.0,
+  "target_modules": [
+    "q_proj",
+    "k_proj",
+    "v_proj",
+    "o_proj",
+    "gate_proj",
+    "up_proj",
+    "down_proj"
+  ],
+  "lora_dropout": 0.0,
+  "fan_in_fan_out": false,
+  "bias": "none",
+  "task_type": "CAUSAL_LM"
+}

@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Veltrix Architecture</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --fg: #c9d1d9;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --border: #30363d;
+    --code-bg: #161b22;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--fg);
+    line-height: 1.6;
+    padding: 2rem;
+  }
+  h1 { color: var(--accent); font-size: 2.2rem; margin-bottom: 0.5rem; }
+  h2 { color: var(--accent); margin-top: 2.5rem; border-bottom: 1px solid var(--border); padding-bottom: 0.3rem; }
+  h3 { color: #f0f6fc; margin-top: 1.5rem; }
+  h4 { color: var(--green); margin-top: 1rem; }
+  p { margin: 0.8rem 0; }
+  a { color: var(--accent); }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 1rem;
+    overflow-x: auto;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
+  code { font-family: inherit; font-size: 0.9em; background: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 1rem 0; }
+  th, td { border: 1px solid var(--border); padding: 0.5rem 0.8rem; text-align: left; }
+  th { background: #161b22; color: var(--accent); }
+  .status-done { color: var(--green); font-weight: bold; }
+  .status-progress { color: var(--orange); font-weight: bold; }
+  .status-blocked { color: var(--red); font-weight: bold; }
+  .status-pending { color: #8b949e; }
+  .tag {
+    display: inline-block; font-size: 0.75rem; padding: 0.15em 0.5em; border-radius: 10px; margin: 0 0.3em;
+  }
+  .tag-arch { background: #1f6feb33; color: #58a6ff; border: 1px solid #1f6feb66; }
+  .tag-bug { background: #da363333; color: #f85149; border: 1px solid #da363366; }
+  .tag-perf { background: #23863633; color: #3fb950; border: 1px solid #23863666; }
+  .tag-feat { background: #9e6a0333; color: #d29922; border: 1px solid #9e6a0366; }
+  .sidebar {
+    position: fixed; top: 0; left: 0; width: 260px; height: 100vh;
+    background: #161b22; border-right: 1px solid var(--border);
+    padding: 1.5rem; overflow-y: auto;
+  }
+  .sidebar h2 { font-size: 1rem; margin-top: 1.2rem; border: none; }
+  .sidebar ul { list-style: none; padding: 0; }
+  .sidebar li { margin: 0.3rem 0; }
+  .sidebar a { color: #8b949e; text-decoration: none; font-size: 0.85rem; }
+  .sidebar a:hover { color: var(--accent); }
+  .main { margin-left: 280px; max-width: 960px; }
+  .badge { display: inline-block; padding: 0.2em 0.6em; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+  .badge-pass { background: #238636; color: #fff; }
+  .badge-fail { background: #da3633; color: #fff; }
+  .badge-warn { background: #9e6a03; color: #fff; }
+  @media (max-width: 768px) {
+    .sidebar { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    .main { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <h2 style="color:#58a6ff;border:none;margin-top:0;">Veltrix</h2>
+  <p style="font-size:0.8rem;color:#8b949e;">v0.1 — Architecture</p>
+  <h2>Overview</h2>
+  <ul>
+    <li><a href="#intro">Introduction</a></li>
+    <li><a href="#history">Development History</a></li>
+    <li><a href="#structure">Project Structure</a></li>
+  </ul>
+  <h2>Architecture</h2>
+  <ul>
+    <li><a href="#system">System Architecture</a></li>
+    <li><a href="#model">Model Lifecycle</a></li>
+    <li><a href="#forward">Forward Pass</a></li>
+    <li><a href="#formats">Format Abstraction</a></li>
+    <li><a href="#tensors">Tensor System</a></li>
+    <li><a href="#tokenizer">Tokenizer</a></li>
+    <li><a href="#quant">Quantization</a></li>
+    <li><a href="#simd">SIMD Kernels</a></li>
+    <li><a href="#meta">Meta-Learning</a></li>
+    <li><a href="#scheduler">Free-Energy Scheduler</a></li>
+    <li><a href="#lora">LoRA Adapters</a></li>
+  </ul>
+  <h2>Status</h2>
+  <ul>
+    <li><a href="#issues">Known Issues</a></li>
+    <li><a href="#bugs">Bug Tracker</a></li>
+    <li><a href="#roadmap">Roadmap</a></li>
+    <li><a href="#benchmarks">Benchmarks</a></li>
+  </ul>
+</div>
+
+<div class="main">
+
+<h1>Veltrix Engine Architecture</h1>
+<p><span class="badge badge-pass">v0.1</span>
+   <span class="badge badge-warn">Development</span>
+   <span style="color:#8b949e;font-size:0.9rem;">2026-06-13</span></p>
+
+<p>Veltrix is a lightweight, dependency-free inference engine for transformer-based LLMs, targeting edge devices (N100, phones) with 40+ tok/s for Q4_0 1B-class models.</p>
+
+<!-- ================================================================== -->
+<h2 id="intro">Introduction</h2>
+<p><strong>Goal:</strong> Extend Veltrix to a multi-format inference engine with zero external deps, targeting 40+ tok/s on N100/phone for Q4_0 1B-class models.</p>
+
+<p><strong>Core Principles:</strong></p>
+<ul>
+  <li><strong>Zero external dependencies</strong> — JSON parser, protobuf reader all self-contained</li>
+  <li><strong>Drop-in compatibility</strong> — Place any popular GGUF model in <code>models/</code> and run</li>
+  <li><strong>Multi-format</strong> — GGUF, Safetensors, ONNX</li>
+  <li><strong>Multi-architecture</strong> — Qwen2, Llama, Mistral, Gemma, Phi-2, Phi-3, StarCoder2</li>
+  <li><strong>Optimized for edge</strong> — AVX2 SIMD, quantized GEMV, memory consolidation</li>
+  <li><strong>Predictive optimization</strong> — Free-energy scheduler, meta-learning, speculative decoding</li>
+</ul>
+
+<p><strong>Target Architectures:</strong></p>
+<table>
+  <tr><th>Arch</th><th>Enum</th><th>Models</th><th>MLP Type</th><th>Norm Type</th></tr>
+  <tr><td>Qwen2</td><td><code>VX_ARCH_QWEN2</code></td><td>Qwen2, Qwen2.5</td><td>SwiGLU</td><td>RMS</td></tr>
+  <tr><td>LLaMA</td><td><code>VX_ARCH_LLAMA</code></td><td>LLaMA 2/3, TinyLlama</td><td>SwiGLU</td><td>RMS</td></tr>
+  <tr><td>Mistral</td><td><code>VX_ARCH_MISTRAL</code></td><td>Mistral v0.1–0.3</td><td>SwiGLU</td><td>RMS</td></tr>
+  <tr><td>Gemma</td><td><code>VX_ARCH_GEMMA</code></td><td>Gemma, Gemma 2</td><td>GEGLU</td><td>RMS</td></tr>
+  <tr><td>Phi</td><td><code>VX_ARCH_PHI</code></td><td>Phi-1, Phi-1.5, Phi-2</td><td>Classic (GELU)</td><td>Layer</td></tr>
+  <tr><td>Phi-3</td><td><code>VX_ARCH_PHI3</code></td><td>Phi-3 Mini/Medium</td><td>SwiGLU</td><td>RMS</td></tr>
+  <tr><td>StarCoder</td><td><code>VX_ARCH_STARCODER</code></td><td>StarCoder, StarCoder 2</td><td>Classic (GELU)</td><td>RMS</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="history">Development History</h2>
+
+<h3>Phase 1 — Format Abstraction <span class="tag tag-arch">DONE</span></h3>
+<p>Created <code>include/format.h</code> and <code>src/format.c</code> with the loader registry pattern, format auto-detection, weight resolution by name pattern, and architecture auto-configuration. Three format loaders registered: GGUF, Safetensors, ONNX.</p>
+
+<h3>Phase 2 — Safetensors Loader <span class="tag tag-arch">DONE</span></h3>
+<p>Embedded JSON parser (<code>js_skip_ws</code>, <code>js_skip_string</code>, <code>js_skip_value</code>, <code>js_find_key</code>), HF config.json reader, F16/BF16→F32 conversion.</p>
+
+<h3>Phase 3 — Tokenizer <span class="tag tag-arch">DONE</span></h3>
+<p>BPE, SentencePiece, TikToken implementations. Auto-load from GGUF metadata or HF <code>tokenizer.json</code>.</p>
+
+<h3>Phase 4 — ONNX Loader <span class="tag tag-arch">DONE</span></h3>
+<p>Minimal protobuf wire format (<code>pb_read_varint</code>, <code>pb_read_tag</code>, <code>pb_read_string</code>), synthetic test passes.</p>
+
+<h3>Phase 5 — LoRA Adapter <span class="tag tag-arch">DONE</span></h3>
+<p>Safetensors-based LoRA loader with <code>vx_lora_load</code>, <code>vx_lora_merge</code> (W += α/r · B × A), <code>vx_lora_destroy</code>.</p>
+
+<h3>Step 1 — Hot-path malloc/free Removal <span class="tag tag-perf">DONE</span></h3>
+<p>Permanent scratch buffer on <code>vx_model</code> struct, norm_tmp reuse via <code>scratch</code> pointer offset, no malloc/free in <code>vx_model_forward</code> hot path.</p>
+
+<h3>Step 2 — SIMD Kernels <span class="tag tag-perf">DONE</span></h3>
+<p>AVX2 dispatch in <code>tensor.c</code>: <code>rms_norm</code>, <code>softmax</code>, <code>silu</code>, <code>add_f32</code>, <code>mul_f32</code>, <code>gelu</code>, <code>rope</code>. ONNX test: 971→872 µs (~10% improvement).</p>
+
+<h3>Step 3 — Direct Q4_0 GEMV <span class="tag tag-perf">DONE</span></h3>
+<p><code>vx_gemv_q4_0_avx2</code> and sparse variants replace dequant+gemv path for Q4_0 weights. Fixed fp16 bug (<code>vx_fp16_to_fp32</code>).</p>
+
+<h3>Step 4 — Memory Layout <span class="tag tag-perf">DONE</span></h3>
+<p>Single contiguous <code>tensor_data</code> allocation consolidating all weight tensors (reduces TLB misses, improves prefetching).</p>
+
+<h3>Step 5 — Dequant Scratch Buffer <span class="tag tag-perf">DONE</span></h3>
+<p>Permanent <code>dequant_tmp</code> buffer on <code>vx_model</code>, eliminates 256 MB malloc/free per forward for Q6_K tensors. Passed to all <code>apply_gemv</code>/<code>apply_gemv_sparse_rows</code> calls.</p>
+
+<h3>Current Problems <span class="tag tag-bug">OPEN</span></h3>
+<p><strong>1. Tokenizer/Model vocab mismatch (Qwen2):</strong> GGUF file has no <code>vocab_size</code> KV pair (vocab size = 151936 from <code>tokenizer.ggml.tokens</code> array length). Code falls back to 32000, truncating the tokenizer to 32000 tokens. <code>model.config.n_vocab</code> is auto-corrected to 151936 from tensor shape, but tokenizer stays at 32000.</p>
+<p><strong>2. Poor output quality:</strong> Downstream of tokenizer mismatch — token IDs 32000+ are not in the tokenizer vocabulary, causing decode failures and gibberish output.</p>
+<p><strong>3. Throughput bottleneck:</strong> TinyLlama 1.1B only 4.6 tok/s (target 40+). Q6_K <code>output.weight</code> previously causing 256 MB malloc per forward (now fixed with dequant_tmp). Further investigation needed.</p>
+
+<!-- ================================================================== -->
+<h2 id="structure">Project Structure</h2>
+<pre>
+veltrix/
+├── CMakeLists.txt                 8 build targets
+├── include/
+│   ├── veltrix.h                   Core types: vx_model, vx_tensor, config, enums
+│   ├── model.h                     vx_model_create/destroy/forward
+│   ├── tensor.h                    Tensor ops: gemv, norm, softmax, rope, etc.
+│   ├── format.h                    Format detection, vx_loader, weight resolution
+│   ├── gguf.h                      GGUF parser types
+│   ├── tokenizer.h                 BPE / SentencePiece / TikToken vtable
+│   ├── quantize.h                  Block structs block_q4_0..block_q6_K
+│   ├── scheduler.h                 Free-energy scheduler
+│   ├── speculative.h               Speculative decoding
+│   ├── metalearn.h                 Meta-predictor, meta-system
+│   └── simd/simd.h                 AVX2 dispatch declarations
+├── src/
+│   ├── main.c                      CLI runner
+│   ├── model.c                     Core inference (forward, attention, FFN, KV cache)
+│   ├── format.c                    Loader registry, weight resolution
+│   ├── gguf.c                      GGUF v3 binary parser + loader
+│   ├── safetensors.c               Safetensors loader + embedded JSON
+│   ├── onnx.c                      Protobuf wire format reader
+│   ├── tensor.c                    Tensor ops + generic dispatch
+│   ├── quantize.c                  Dequantization kernels
+│   ├── tokenizer.c                 BPE / SP / TikToken implementations
+│   ├── lora.c                      LoRA loading + merging
+│   ├── metalearn.c                 2-layer MLP meta-predictor
+│   ├── scheduler.c                 Free-energy compute &amp; decide
+│   ├── speculative.c               Draft-then-verify
+│   └── simd/avx2.c                 AVX2-optimized kernels
+├── tests/
+│   ├── test_gguf.c                 26 unit tests
+│   ├── test_e2e.c                  Synthetic GGUF end-to-end
+│   ├── test_tokenizer_json.c       BPE round-trip
+│   ├── test_tiktoken.c             TikToken round-trip
+│   ├── test_onnx.c                 ONNX model load + forward
+│   ├── test_lora.c                 LoRA merge formula + forward
+│   ├── benchmark.c                 Microbenchmarks
+│   ├── gen_onnx.py                 Synthetic ONNX generator
+│   └── gen_lora.py                 Synthetic LoRA generator
+├── models/                         Downloaded GGUF files
+│   ├── tinyllama-1.1b-q4_0.gguf   636 MB
+│   ├── qwen2.5-0.5b-q4_0.gguf     353 MB
+│   ├── qwen2.5-0.5b-instruct-q4_0.gguf  429 MB
+│   └── llama3.2-1b-q4_0.gguf      773 MB
+├── docs/                           Documentation
+└── build/                          Compiled binaries
+</pre>
+
+<!-- ================================================================== -->
+<h2 id="system">System Architecture</h2>
+<p>The engine is organized as a pipeline with clear separation of concerns:</p>
+<pre>
+┌──────────────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
+│  Format      │ →  │  Weight      │ →  │  Memory      │ →  │  Forward     │
+│  Detection   │    │  Resolution  │    │  Consolidation│    │  Engine      │
+│  (magic/ext) │    │  (name match)│    │  (one alloc) │    │  (inference) │
+└──────────────┘    └──────────────┘    └──────────────┘    └──────────────┘
+                                                                    │
+              ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐│
+              │ AVX2     │  │ Q4_0     │  │ Dequant  │  │ Sparse   ││
+              │ SIMD     │  │ Direct   │  │ Scratch  │  │ GEMV     ││
+              │ Kernels  │  │ GEMV     │  │ Buffer   │  │ (gate)   ││
+              └──────────┘  └──────────┘  └──────────┘  └──────────┘▼
+</pre>
+
+<h3>Key Design Decisions</h3>
+<ul>
+  <li><strong>Architecture auto-detection</strong> via <code>general.architecture</code> string; per-arch defaults in <code>arch_table</code> in <code>format.c</code>.</li>
+  <li><strong>Tensor dimensions</strong> stored in <code>ne[0..3]</code> following GGUF convention; ONNX/safetensors dims reversed on load.</li>
+  <li><strong>No constructor attributes</strong> for loaders; explicit <code>vx_format_init()</code> called from <code>vx_model_create</code>.</li>
+  <li><strong>Tokenizer</strong> auto-loaded during model creation (best-effort, non-fatal on failure).</li>
+  <li><strong>LoRA merge</strong> performed in-place on model weights (pre-merge) rather than on-the-fly.</li>
+  <li><strong>Performance improvement order:</strong> hot-path malloc/free → SIMD → direct quantized GEMV → memory layout → dequant scratch.</li>
+</ul>
+
+<!-- ================================================================== -->
+<h2 id="model">Model Lifecycle</h2>
+<h3>Creation: <code>vx_model_create(path, &amp;model)</code></h3>
+<pre>
+1. vx_format_init()              → register loaders
+2. fopen(path), read 16 bytes    → detect format (GGUF magic / Safetensors / ONNX)
+3. loader → load(path, model)    → format-specific loading
+   ├── GGUF: parse header → KV pairs → tensor info → tensor data
+   │          → vx_model_apply_arch() for MLP/norm/bias
+   ├── Safetensors: read config.json, JSON header, tensor data
+   │          → reverse dims (HF → Veltrix), F16/BF16→F32
+   └── ONNX: parse protobuf ModelProto → GraphProto → initializer
+4. vx_model_resolve_weights()    → match tensor names to model fields
+5. Memory consolidation          → single contiguous allocation
+6. KV cache init                 → calloc(n_layers × max_seq_len × ...)
+7. Tokenizer auto-load           → GGUF metadata or tokenizer.json
+8. Meta-system + FE state init   → if enabled
+9. dequant_tmp allocation        → largest tensor size
+</pre>
+
+<h3>Destruction: <code>vx_model_destroy(model)</code></h3>
+<pre>
+free(tensor_data)
+free(k_cache), free(v_cache)
+free(scratch), free(dequant_tmp)
+free(tensors[])
+destroy meta-predictors
+free(tokenizer)
+free(model)
+</pre>
+
+<!-- ================================================================== -->
+<h2 id="forward">Forward Pass</h2>
+<pre>
+vx_model_forward(model, tokens, n_tokens, logits)
+│
+├── 1. EMBEDDING
+│     x[i] = tok_embd[tokens[i]]  for i=0..n_tokens-1
+│
+├── 2. FOR EACH LAYER l = 0..n_layers-1:
+│     │
+│     ├── a) Meta decision (if enabled)
+│     │     skip / exact / exit
+│     │
+│     ├── b) Pre-attention norm
+│     │     x = RMSNorm(x, attn_norm[l].weight)
+│     │
+│     ├── c) QKV projections
+│     │     q = apply_gemv(attn_q[l], x, n_embd, n_embd, dequant_tmp)
+│     │     k = apply_gemv(attn_k[l], x, kv_dim, n_embd, dequant_tmp)
+│     │     v = apply_gemv(attn_v[l], x, kv_dim, n_embd, dequant_tmp)
+│     │     [+ bias if present]
+│     │
+│     ├── d) RoPE
+│     │     vx_rope(q, k, pos, n_heads, n_kv_heads, head_dim, rope_dims, theta)
+│     │
+│     ├── e) KV cache store (pos = cache_len)
+│     │
+│     ├── f) Attention
+│     │     scores = q · k_cache^T / sqrt(head_dim)
+│     │     causal mask + softmax
+│     │     attn_out = scores · v_cache
+│     │     apply_gemv(attn_o[l], attn_out, n_embd, n_embd, dequant_tmp)
+│     │
+│     ├── g) Residual
+│     │     x = x + attn_out
+│     │
+│     ├── h) FFN norm
+│     │     x = RMSNorm(x, ffn_norm[l].weight)
+│     │
+│     ├── i) FFN
+│     │     SwiGLU: out = SiLU(gate·x) * (up·x)  × down
+│     │     GEGLU:  out = GELU(gate·x) * (up·x)  × down
+│     │     CLASSIC: out = GELU(up·x)   × down
+│     │
+│     ├── j) Residual
+│     │     x = x + ffn_out
+│     │
+│     └── k) Meta update (if enabled)
+│
+├── 3. Final norm
+│     x = RMSNorm(x, output_norm.weight) [+ bias]
+│
+├── 4. Output projection
+│     logits = x × output_weight.T  (or tok_embd.T if tied)
+│
+└── 5. cache_len += n_tokens
+</pre>
+
+<h3>GEMV Dispatch</h3>
+<pre>
+apply_gemv(w, x, y, rows, cols, dqtmp):
+  switch w->type:
+    VX_TYPE_F32:
+      vx_gemv_f32_avx2(y, (float*)w->data, x, rows, cols)    #if AVX2
+      vx_gemv_f32(...)                                         #else
+
+    VX_TYPE_Q4_0:
+      vx_gemv_q4_0_avx2(w->data, x, y, rows, cols)            #if AVX2 (direct)
+      dequant → f32_gemv                                        #else
+
+    default (Q6_K, Q2_K, etc.):
+      tmp = dqtmp ? dqtmp : malloc(rows * cols * sizeof(float))
+      vx_dequantize(w->data, tmp, rows * cols, w->type)
+      vx_gemv_f32_avx2(y, tmp, x, rows, cols)                  #if AVX2
+      vx_gemv_f32(...)                                          #else
+      if (!dqtmp) free(tmp)
+</pre>
+
+<!-- ================================================================== -->
+<h2 id="formats">Format Abstraction</h2>
+<h3>Loader Registry</h3>
+<pre>
+static const vx_loader *s_loaders[16];
+static int s_n_loaders = 0;
+
+typedef struct {
+    const char *name;                   // "gguf", "safetensors", "onnx"
+    vx_format format;                   // VX_FORMAT_GGUF, etc.
+    vx_error (*load)(const char *path, vx_model *model);
+} vx_loader;
+</pre>
+
+<h3>Format Detection</h3>
+<pre>
+vx_detect_format(magic, size, filename)
+  ├── GGUF:  header[0..3] = "GGUF"
+  ├── SAFETENSORS: uint64 hlen + JSON object '{'
+  ├── ONNX:  extension .onnx
+  └── UNKNOWN: fallback
+</pre>
+
+<h3>Weight Resolution</h3>
+<p>Maps GGUF tensor names (e.g., <code>blk.0.attn_q.weight</code>) and HF names (e.g., <code>model.layers.0.self_attn.q_proj.weight</code>) to model fields. Architecture-specific patterns with fuzzy matching.</p>
+
+<!-- ================================================================== -->
+<h2 id="tensors">Tensor System</h2>
+<pre>
+typedef struct {
+    int32_t ne[4];           // shape: ne[0] = fastest-changing
+    size_t  nbytes;          // total bytes
+    vx_type type;            // F32, Q4_0, Q6_K, etc.
+    uint8_t *data;           // raw data pointer
+    bool    owned;           // if true, data is own allocation
+    char    name[64];        // tensor name
+} vx_tensor;
+</pre>
+
+<h3>Type System</h3>
+<table>
+  <tr><th>Type</th><th>Value</th><th>Description</th><th>Block</th></tr>
+  <tr><td>VX_TYPE_F32</td><td>0</td><td>32-bit float</td><td>4 B</td></tr>
+  <tr><td>VX_TYPE_F16</td><td>1</td><td>16-bit float</td><td>2 B</td></tr>
+  <tr><td>VX_TYPE_Q4_0</td><td>2</td><td>4-bit block quant</td><td>18 B / 32 elts</td></tr>
+  <tr><td>VX_TYPE_Q6_K</td><td>14</td><td>6-bit K-quant</td><td>210 B / 256 elts</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="tokenizer">Tokenizer</h2>
+<h3>Types</h3>
+<table>
+  <tr><th>Type</th><th>Value</th><th>Models</th></tr>
+  <tr><td>BPE</td><td>1</td><td>GPT-2, StarCoder, Phi</td></tr>
+  <tr><td>SentencePiece</td><td>2</td><td>LLaMA, Mistral, Gemma</td></tr>
+  <tr><td>TikToken</td><td>3</td><td>Qwen2, Phi-3, DeepSeek</td></tr>
+</table>
+
+<h3>Loading Priority</h3>
+<pre>
+vx_tokenizer_auto_load(path, tok):
+  if GGUF:
+    vx_tokenizer_load_gguf(buf, size, tok)    → from GGUF KV metadata
+  else:
+    read tokenizer.json alongside safetensors  → vx_tokenizer_load_hf()
+</pre>
+
+<h3>Vocab Size Bug (Qwen2)</h3>
+<p>Qwen2.5 GGUF files have no <code>vocab_size</code> metadata key. Vocab size (=151936) is only available from the length of <code>tokenizer.ggml.tokens</code> string array (151936 entries) and from <code>token_embd.weight</code> tensor shape. The tokenizer loader falls back to 32000, truncating. The model config is auto-corrected by tensor shape detection, but the tokenizer stays truncated.</p>
+
+<!-- ================================================================== -->
+<h2 id="quant">Quantization</h2>
+<p>Block structures for Q4_0 through Q6_K defined in <code>quantize.h</code>. Full dequantize implemented for Q4_0, Q4_1, Q5_0, Q5_1, Q8_0, Q2_K, Q6_K. Direct GEMV (no dequant) for Q4_0 with AVX2. Other types fall through to dequant+gemv path.</p>
+
+<h3>Q4_0 Block (18 bytes / 32 elements)</h3>
+<pre>
+typedef struct {
+    uint16_t d;       // fp16 scale
+    uint8_t  qs[16];  // 4-bit nibbles (2 per byte)
+} block_q4_0;
+</pre>
+
+<h3>Q6_K Block (210 bytes / 256 elements)</h3>
+<pre>
+typedef struct {
+    uint8_t  ql[128];  // low 4 bits
+    uint8_t  qh[64];   // high 2 bits
+    int8_t   scales[16];
+    uint16_t d;        // fp16 scale (highest 6 bits in d)
+} block_q6_K;
+</pre>
+
+<!-- ================================================================== -->
+<h2 id="simd">SIMD Kernels</h2>
+<h3>Implemented (AVX2)</h3>
+<table>
+  <tr><th>Function</th><th>Source</th><th>Notes</th></tr>
+  <tr><td>vx_dot_f32_avx2</td><td>avx2.c</td><td>FMA dot product</td></tr>
+  <tr><td>vx_mat_mul_f32_avx2</td><td>avx2.c</td><td>6× unrolled</td></tr>
+  <tr><td>vx_rms_norm_avx2</td><td>avx2.c</td><td>vectorized</td></tr>
+  <tr><td>vx_softmax_avx2</td><td>avx2.c</td><td>vectorized max+exp+sum</td></tr>
+  <tr><td>vx_silu_avx2</td><td>avx2.c</td><td>vectorized</td></tr>
+  <tr><td>vx_add_f32_avx2</td><td>avx2.c</td><td>vectorized</td></tr>
+  <tr><td>vx_mul_f32_avx2</td><td>avx2.c</td><td>vectorized</td></tr>
+  <tr><td>vx_gelu_avx2</td><td>avx2.c</td><td>vectorized GELU</td></tr>
+  <tr><td>vx_rope_avx2</td><td>avx2.c</td><td>vectorized RoPE</td></tr>
+  <tr><td>vx_gemv_f32_avx2</td><td>avx2.c</td><td>FMA GEMV</td></tr>
+  <tr><td>vx_gemv_q4_0_avx2</td><td>avx2.c</td><td>direct Q4_0 GEMV</td></tr>
+  <tr><td>vx_gemv_q4_0_avx2_sparse_rows</td><td>avx2.c</td><td>gated row skip</td></tr>
+  <tr><td>vx_gemv_q4_0_avx2_sparse_cols_add</td><td>avx2.c</td><td>gated col skip</td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="meta">Meta-Learning</h2>
+<p>2-layer MLP (n_embd → 128 → n_embd) with ReLU hidden activation, trained via online SGD during inference. Predicts hidden state norms, attention patterns, and early exit decisions.</p>
+
+<h3>Meta-Predictor</h3>
+<pre>
+predict(hidden_state):
+  h = ReLU(W1 · x + b1)
+  y = W2 · h + b2
+  confidence = precision / (precision + ||y - actual||²)
+
+update(hidden_state, actual):
+  error = y - actual
+  W1 -= lr * error · W2ᵀ · ReLU'(h) · xᵀ
+  W2 -= lr · h · errorᵀ
+  update running_mean / running_var
+</pre>
+
+<h3>Decisions</h3>
+<ul>
+  <li><strong>Layer skip:</strong> predict layer output norm; if confidence > threshold, skip computation</li>
+  <li><strong>Attention pattern:</strong> predict attention distribution; skip if confidently similar to previous</li>
+  <li><strong>Early exit:</strong> predict if early layer output is sufficient</li>
+</ul>
+
+<!-- ================================================================== -->
+<h2 id="scheduler">Free-Energy Scheduler</h2>
+<p>Computes free energy and prediction error at each layer to decide compute level (EXACT / APPROX / SKIP).</p>
+
+<pre>
+Free Energy = 0.5 × precision × ||predicted - actual||² - 0.5 × ln(precision)
+Prediction Error = MSE(predicted, actual)
+</pre>
+
+<h3>Policies</h3>
+<ul>
+  <li><strong>MIN_FE:</strong> minimize total free energy</li>
+  <li><strong>TARGET_SKIP:</strong> target a specific skip rate</li>
+  <li><strong>ADAPTIVE:</strong> adapt based on recent history</li>
+</ul>
+
+<!-- ================================================================== -->
+<h2 id="lora">LoRA Adapters</h2>
+<p>Loads LoRA safetensors and <code>adapter_config.json</code>, applies W += α/r · B × A to matched weight tensors.</p>
+
+<h3>Limitations</h3>
+<ul>
+  <li>Only supports linear projections (no embedding, no Conv2D)</li>
+  <li>Merge is destructive (permanent modification of model weights)</li>
+  <li>No support for DoRA, PiSSA, or other PEFT variants</li>
+</ul>
+
+<!-- ================================================================== -->
+<h2 id="issues">Known Issues</h2>
+
+<h3>Tokenizer Vocab Mismatch <span class="tag tag-bug">BUG</span></h3>
+<p><strong>File:</strong> <code>src/tokenizer.c:700-715</code>, <code>src/gguf.c:484-486</code></p>
+<p><strong>Symptom:</strong> Qwen2.5 GGUF models show "Tokenizer: BPE (32000 tokens, bos=1 eos=2)" while model vocab is 151936. Output text is garbled for tokens &gt; 32000.</p>
+<p><strong>Root cause:</strong> GGUF files generated by llama.cpp's convert script for Qwen2.5 do not include a <code>vocab_size</code> metadata key. The vocabulary size is only available implicitly from the length of <code>tokenizer.ggml.tokens</code> array and from tensor dimensions. The C code assumes a <code>vocab_size</code> KV pair exists, falls back to 32000 when missing, and <code>gguf_scan_str_array</code> truncates to this incorrect limit.</p>
+<p><strong>Fix:</strong> When <code>vocab_size</code> KV is missing, derive it from <code>tokenizer.ggml.tokens</code> array length or from <code>token_embd.weight</code> tensor dimensions.</p>
+
+<h3>K-Quant Type Sizes <span class="tag tag-bug">BUG</span></h3>
+<p><strong>File:</strong> <code>src/tensor.c:22-24</code></p>
+<p><code>vx_type_size()</code> returns 0 for Q4_K, Q5_K, Q8_K types. Only Q3_K and Q6_K have correct sizes.</p>
+
+<h3>Missing K-Quant Dequant <span class="tag tag-bug">BUG</span></h3>
+<p><strong>File:</strong> <code>src/quantize.c</code></p>
+<p>Only Q2_K and Q6_K dequant implementations exist. Q3_K, Q4_K, Q5_K, Q8_K dequant functions declared in header but not implemented.</p>
+
+<h3>FE State Reset <span class="tag tag-bug">BUG</span></h3>
+<p><strong>File:</strong> <code>src/scheduler.c:30-32</code></p>
+<p><code>vx_fe_state_reset()</code> only resets 1 layer (<code>sizeof(float) * 1</code> instead of <code>* n_layers</code>).</p>
+
+<h3>gguf_scan_str_array Offset Leak <span class="tag tag-bug">BUG</span></h3>
+<p><strong>File:</strong> <code>src/tokenizer.c:517-534</code></p>
+<p>When array read is truncated (<code>n &lt; alen</code>), remaining items are not skipped, leaving offset pointing mid-array. Currently masked because callers reset <code>kv_off = 24</code> before each scan.</p>
+
+<h3>Throughput <span class="tag tag-perf">PERF</span></h3>
+<p>TinyLlama 1.1B Q4_0: 4.6 tok/s on N100 (target 40+). Suspected causes: (1) Q6_K output.weight still goes through dequant path despite dequant_tmp, (2) bandwidth utilization only ~10% (2.9 GB/s vs 30 GB/s theoretical).</p>
+
+<h3>Missing GGUF Type Mapping <span class="tag tag-bug">BUG</span></h3>
+<p><code>gguf_to_vx_type()</code> has no cases for GGML_TYPE_Q4_1, Q5_0, Q5_1, Q8_1 (returns F32 fallback).</p>
+
+<!-- ================================================================== -->
+<h2 id="bugs">Bug Tracker</h2>
+<table>
+  <tr><th>ID</th><th>Severity</th><th>Description</th><th>File</th><th>Status</th></tr>
+  <tr><td>B-001</td><td>HIGH</td><td>Tokenizer vocab truncated to 32000 for Qwen2</td><td>tokenizer.c:700</td><td><span class="status-progress">In Progress</span></td></tr>
+  <tr><td>B-002</td><td>HIGH</td><td>Poor output quality (downstream of B-001)</td><td>main.c, tokenizer.c</td><td><span class="status-blocked">Blocked on B-001</span></td></tr>
+  <tr><td>B-003</td><td>LOW</td><td>vx_type_size returns 0 for Q4_K, Q5_K, Q8_K</td><td>tensor.c:22</td><td><span class="status-pending">Pending</span></td></tr>
+  <tr><td>B-004</td><td>LOW</td><td>K-quant dequant absent for Q3_K, Q4_K, Q5_K, Q8_K</td><td>quantize.c</td><td><span class="status-pending">Pending</span></td></tr>
+  <tr><td>B-005</td><td>MEDIUM</td><td>FE state reset only resets 1 layer</td><td>scheduler.c:30</td><td><span class="status-pending">Pending</span></td></tr>
+  <tr><td>B-006</td><td>LOW</td><td>gguf_scan_str_array offset leak on truncation</td><td>tokenizer.c:517</td><td><span class="status-pending">Pending</span></td></tr>
+  <tr><td>B-007</td><td>LOW</td><td>Missing GGUF type mappings (Q4_1, Q5_0, Q5_1, Q8_1)</td><td>gguf.c:11</td><td><span class="status-pending">Pending</span></td></tr>
+  <tr><td>B-008</td><td>HIGH</td><td>Throughput 4.6 tok/s (target 40+)</td><td>model.c, tensor.c</td><td><span class="status-progress">Investigating</span></td></tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="roadmap">Roadmap</h2>
+<table>
+  <tr><th>Phase</th><th>Item</th><th>Status</th><th>Priority</th></tr>
+  <tr>
+    <td>Fix</td>
+    <td>Tokenizer vocab from tensor_embd shape if no vocab_size KV</td>
+    <td><span class="status-progress">In Progress</span></td>
+    <td>HIGH</td>
+  </tr>
+  <tr>
+    <td>Fix</td>
+    <td>Fix output quality — verify tokenizer round-trip for all archs</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>HIGH</td>
+  </tr>
+  <tr>
+    <td>Perf</td>
+    <td>Q6_K direct GEMV (eliminate dequant entirely)</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>HIGH</td>
+  </tr>
+  <tr>
+    <td>Perf</td>
+    <td>Multi-threaded attention (OpenMP)</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>HIGH</td>
+  </tr>
+  <tr>
+    <td>Perf</td>
+    <td>Investigate 10% bandwidth utilization</td>
+    <td><span class="status-progress">Investigating</span></td>
+    <td>HIGH</td>
+  </tr>
+  <tr>
+    <td>Fix</td>
+    <td>K-quant type sizes (Q4_K, Q5_K, Q8_K)</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>MEDIUM</td>
+  </tr>
+  <tr>
+    <td>Fix</td>
+    <td>K-quant dequant implementations</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>MEDIUM</td>
+  </tr>
+  <tr>
+    <td>Fix</td>
+    <td>FE state reset buffer size</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>MEDIUM</td>
+  </tr>
+  <tr>
+    <td>Fix</td>
+    <td>GGUF type mapping completeness</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>LOW</td>
+  </tr>
+  <tr>
+    <td>Fix</td>
+    <td>gguf_scan_str_array offset skip after truncation</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>LOW</td>
+  </tr>
+  <tr>
+    <td>Arch</td>
+    <td>ARM NEON kernels (phone target)</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>MEDIUM</td>
+  </tr>
+  <tr>
+    <td>Arch</td>
+    <td>Interactive chat mode</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>MEDIUM</td>
+  </tr>
+  <tr>
+    <td>Arch</td>
+    <td>Speculative decoding integration</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>MEDIUM</td>
+  </tr>
+  <tr>
+    <td>Arch</td>
+    <td>Thread pool / batched inference</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>LOW</td>
+  </tr>
+  <tr>
+    <td>Arch</td>
+    <td>MoE (Mixtral) support</td>
+    <td><span class="status-pending">Pending</span></td>
+    <td>LOW</td>
+  </tr>
+</table>
+
+<!-- ================================================================== -->
+<h2 id="benchmarks">Benchmarks</h2>
+<h3>Synthetic (2 layers, 64 embd, Q4_0)</h3>
+<table>
+  <tr><th>Target</th><th>Avg</th><th>tok/s</th><th>Notes</th></tr>
+  <tr><td>veltrix_test (unit)</td><td>—</td><td>—</td><td>26 tests, all pass</td></tr>
+  <tr><td>veltrix_e2e</td><td>885 µs</td><td>1130</td><td>Synthetic GGUF</td></tr>
+  <tr><td>veltrix_onnx</td><td>1084 µs</td><td>923</td><td>Synthetic ONNX</td></tr>
+</table>
+
+<h3>Real Model (TinyLlama 1.1B, 22 layers, 2048 embd, Q4_0)</h3>
+<table>
+  <tr><th>Metric</th><th>Value</th><th>Target</th></tr>
+  <tr><td>Throughput</td><td>4.6 tok/s</td><td>40+ tok/s</td></tr>
+  <tr><td>Bandwidth util</td><td>~2.9 GB/s</td><td>~30 GB/s (DDR5)</td></tr>
+  <tr><td>Efficiency</td><td>~10%</td><td>~80%</td></tr>
+</table>
+
+<h3>Benchmark Method</h3>
+<p>Windows <code>QueryPerformanceCounter</code> with cold-start warmup (3 steps). Greedy sampling (argmax).</p>
+
+<hr style="border-color: var(--border); margin: 2rem 0;">
+<p style="color: #8b949e; font-size: 0.85rem;">
+  Veltrix v0.1 — Architecture Document<br>
+  Generated: 2026-06-13<br>
+  Repository: C:\Users\User\Desktop\veltrix
+</p>
+
+</div>
+</body>
+</html>
