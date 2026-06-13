@@ -272,7 +272,7 @@ static void apply_norm(float *x, float *tmp, vx_tensor *w, vx_tensor *b, int dim
 }
 
 static void apply_attention(vx_model *model, float *x, float *q, float *k, float *v,
-                            int n_heads, int n_kv_heads, int head_dim, int layer) {
+                            float *output, int n_heads, int n_kv_heads, int head_dim, int layer) {
     int n_embd = n_heads * head_dim;
     int kv_dim = n_kv_heads * head_dim;
     int pos = model->cache_len;
@@ -294,9 +294,6 @@ static void apply_attention(vx_model *model, float *x, float *q, float *k, float
     memcpy(new_k, k, kv_dim * sizeof(float));
     memcpy(new_v, v, kv_dim * sizeof(float));
 
-    float output_stack[4096];
-    float *output = n_embd <= 4096 ? output_stack : malloc((size_t)n_embd * sizeof(float));
-    if (!output) return;
     memset(output, 0, (size_t)n_embd * sizeof(float));
 
     #pragma omp parallel for
@@ -340,7 +337,6 @@ static void apply_attention(vx_model *model, float *x, float *q, float *k, float
     }
 
     memcpy(x, output, (size_t)n_embd * sizeof(float));
-    if (output != output_stack) free(output);
 }
 
 typedef struct {
@@ -380,6 +376,7 @@ void vx_print_forward_timing(void) {
 void vx_set_n_threads(int n) {
     if (n < 1) n = 1;
     if (n > 128) n = 128;
+    omp_set_dynamic(0);
     omp_set_num_threads(n);
 }
 
@@ -538,7 +535,7 @@ vx_error vx_model_forward(vx_model *model, const int *tokens, int n_tokens, floa
 
             t_stage = g_forward_timing_enabled ? vx_time_now_us() : 0.0;
             vx_rope(q, k, cache_pos, n_heads, n_kv_heads, head_dim, model->config.rope_partial_dims, model->config.rope_theta);
-            apply_attention(model, attn_out, q, k, v, n_heads, n_kv_heads, head_dim, l);
+            apply_attention(model, attn_out, q, k, v, attn_out, n_heads, n_kv_heads, head_dim, l);
 
             if (model->attn_o[l])
                 apply_gemv(model->attn_o[l], attn_out, attn_out, n_embd, n_embd, model->dequant_tmp);

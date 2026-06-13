@@ -59,7 +59,7 @@ int main(int argc, char **argv) {
     (void)n_threads;
 
     if (fast_mode) {
-        vx_set_compute_level(VX_COMPUTE_SKIP);
+        vx_set_compute_level(VX_COMPUTE_ATTN_ONLY);
         use_meta = false;
     }
 
@@ -97,6 +97,11 @@ int main(int argc, char **argv) {
         printf("  Tokenizer: none\n");
     }
     printf("\n");
+
+    if (fast_mode && model->config.n_ctx > 256) {
+        model->config.n_ctx = 256;
+        printf("  Fast context cap: %d\n", model->config.n_ctx);
+    }
 
     // Load LoRA adapter if specified
     vx_lora lora;
