@@ -38,6 +38,7 @@ set(SOURCES
     src/quantize.c
     src/lora.c
     src/speculative.c
+    src/runtime_profile.c
     src/simd/avx2.c
 )
 
@@ -46,7 +47,7 @@ target_include_directories(veltrix PRIVATE include)
 
 set(TEST_SOURCES ${SOURCES})
 list(REMOVE_ITEM TEST_SOURCES src/main.c)
-add_executable(veltrix_test tests/test_gguf.c ${TEST_SOURCES})
+add_executable(veltrix_test tests/test_gguf.c tests/test_runtime_profile.c ${TEST_SOURCES})
 target_include_directories(veltrix_test PRIVATE include)
 
 add_executable(veltrix_bench tests/benchmark.c ${TEST_SOURCES})

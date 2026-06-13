@@ -182,4 +182,6 @@ void vx_set_n_threads(int n);
 void vx_set_forward_timing_enabled(int enabled);
 void vx_print_forward_timing(void);
 
+#include "runtime_profile.h"
+
 #endif

@@ -66,6 +66,7 @@
 - [ ] Memory-mapped tensor loading (mmap)
 - [ ] FP16 intermediate storage for KV cache
 - [ ] Flash attention (CPU-optimized)
+- [ ] Runtime profile contract for target tok/s on low-spec devices
 
 ## Phase 8: Features 💡
 

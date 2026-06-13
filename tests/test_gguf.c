@@ -4,6 +4,7 @@
 #include "quantize.h"
 #include "metalearn.h"
 #include "scheduler.h"
+#include "runtime_profile.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -166,6 +167,8 @@ static void test_scheduler(void) {
     TEST("compute_prediction_error", 1);
 }
 
+extern int vx_test_runtime_profile(void);
+
 int main(void) {
     printf("Veltrix Engine Test Suite\n");
     printf("========================\n");
@@ -174,6 +177,7 @@ int main(void) {
     test_quantization();
     test_meta_predictor();
     test_scheduler();
+    TEST("runtime_profile selection", vx_test_runtime_profile());
 
     printf("\n========================\n");
     printf("Results: %d passed, %d failed\n", tests_passed, tests_failed);
