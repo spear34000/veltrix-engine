@@ -5,6 +5,7 @@
 #include "metalearn.h"
 #include "scheduler.h"
 #include "runtime_profile.h"
+#include "runtime_guard.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -168,6 +169,7 @@ static void test_scheduler(void) {
 }
 
 extern int vx_test_runtime_profile(void);
+extern int vx_test_runtime_guard(void);
 
 int main(void) {
     printf("Veltrix Engine Test Suite\n");
@@ -178,6 +180,7 @@ int main(void) {
     test_meta_predictor();
     test_scheduler();
     TEST("runtime_profile selection", vx_test_runtime_profile());
+    TEST("runtime_guard throttling", vx_test_runtime_guard());
 
     printf("\n========================\n");
     printf("Results: %d passed, %d failed\n", tests_passed, tests_failed);

@@ -2,6 +2,7 @@
 #include "quantize.h"
 #include "../src/simd/simd.h"
 #include "platform.h"
+#include "runtime_profile.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -122,6 +123,23 @@ int main(void) {
     printf("OpenMP: %d threads\n", n_threads);
 
     printf("Timer: monotonic us\n\n");
+
+    vx_model_config sample_cfg = {0};
+    sample_cfg.n_layers = 24;
+    sample_cfg.n_heads = 32;
+    sample_cfg.n_kv_heads = 8;
+    sample_cfg.n_embd = 2048;
+    sample_cfg.n_head_dim = 64;
+    sample_cfg.n_ff = 5632;
+    sample_cfg.n_vocab = 32000;
+    sample_cfg.n_ctx = 4096;
+    vx_runtime_goal target_goal = { .target_tok_s = 15.0f, .quality_floor = 0.85f, .ctx_limit = 256 };
+    vx_device_profile target_device = vx_device_profile_auto();
+    vx_runtime_profile target_profile = vx_choose_runtime_profile(&sample_cfg, &target_device, &target_goal);
+    printf("Target tok/s: %.1f\n", target_goal.target_tok_s);
+    printf("Recommended profile: %s\n", target_profile.name);
+    printf("Expected tok/s: %.1f\n", target_profile.expected_tok_s);
+    printf("Quality floor: %.2f\n\n", target_profile.quality_floor);
 
     int D = 4096;
     int rows[] = {1024, 4096, 11008};
@@ -453,8 +471,6 @@ int main(void) {
     printf("  CAUTION: synthetic gate (10%% active by construction). Real SiLU gate\n");
     printf("  sparsity depends on model, input, and context. Quality impact unverified.\n");
 
-    free(gate);
-
     printf("\n--- MEMORY FOOTPRINT (7B, d=4096, ff=11008, 32L) ---\n\n");
     double pl_B = (double)(4096*4096 + 1024*4096 + 1024*4096 + 4096*4096
                  + 11008*4096 + 11008*4096 + 4096*11008) * 4;
@@ -471,10 +487,6 @@ int main(void) {
            f32_B / 1.073741824e9, q4_B / 1.073741824e9,
            q4_B / 1.073741824e9 < 7.5 ? "fits in 8GB" : "needs 16GB+");
 
-    for (int i = 0; i < n_sizes; i++) {
-        free(ba[i].a); free(ba[i].b); free(ba[i].c); free(ba[i].d);
-        free(ba[i].q);
-    }
     printf("\nDone.\n");
     return 0;
 }

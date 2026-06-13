@@ -28,6 +28,9 @@ static void vx_set_name(char *dst, size_t cap, const char *name) {
     snprintf(dst, cap, "%s", name);
 }
 
+static vx_runtime_profile g_active_profile;
+static bool g_has_active_profile = false;
+
 static float vx_model_pressure(const vx_model_config *cfg) {
     if (!cfg) return 1.0f;
 
@@ -190,4 +193,26 @@ vx_runtime_profile vx_choose_runtime_profile(const vx_model_config *cfg,
     }
 
     return profile;
+}
+
+const vx_runtime_profile *vx_runtime_profile_current(void) {
+    return g_has_active_profile ? &g_active_profile : NULL;
+}
+
+void vx_apply_runtime_profile(vx_model *model, const vx_runtime_profile *profile) {
+    if (!profile) return;
+
+    g_active_profile = *profile;
+    g_has_active_profile = true;
+
+    if (!model) return;
+
+    if (profile->ctx_cap > 0 && (model->config.n_ctx <= 0 || model->config.n_ctx > profile->ctx_cap)) {
+        model->config.n_ctx = profile->ctx_cap;
+    }
+    if (profile->n_threads > 0) {
+        model->config.n_threads = profile->n_threads;
+        vx_set_n_threads(profile->n_threads);
+    }
+    vx_set_compute_level(profile->compute_level);
 }

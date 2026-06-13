@@ -8,6 +8,7 @@
 #include "tokenizer.h"
 #include "platform.h"
 #include "simd/simd.h"
+#include "runtime_profile.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -443,6 +444,8 @@ vx_error vx_model_forward(vx_model *model, const int *tokens, int n_tokens, floa
     vx_tensor *tok_embd = model->tok_embd;
     vx_tensor *output_weight = model->output_w;
     vx_tensor *norm_final_w = model->norm_w;
+    const vx_runtime_profile *active_profile = vx_runtime_profile_current();
+    vx_compute_level runtime_level = active_profile ? active_profile->compute_level : g_compute_level;
 
     for (int pos = 0; pos < n_tokens; pos++) {
         int token = tokens[pos];
@@ -499,10 +502,10 @@ vx_error vx_model_forward(vx_model *model, const int *tokens, int n_tokens, floa
 
         int layer_limit = n_layers;
         int skip_ffn = 0;
-        if (g_compute_level == VX_COMPUTE_ATTN_ONLY) {
+        if (runtime_level == VX_COMPUTE_ATTN_ONLY) {
             layer_limit = n_layers < 4 ? n_layers : 4;
             skip_ffn = 1;
-        } else if (g_compute_level == VX_COMPUTE_SKIP) {
+        } else if (runtime_level == VX_COMPUTE_SKIP) {
             layer_limit = n_layers < 1 ? n_layers : 1;
             skip_ffn = 1;
         }
@@ -602,8 +605,8 @@ vx_error vx_model_forward(vx_model *model, const int *tokens, int n_tokens, floa
             if (output_weight && output_weight->data) {
                 int out_rows = (int)output_weight->ne[1];
                 int out_cols = output_weight->ne[0] > 0 ? (int)output_weight->ne[0] : n_embd;
-                if (g_compute_level == VX_COMPUTE_ATTN_ONLY && out_rows > 8192) out_rows = 8192;
-                if (g_compute_level == VX_COMPUTE_SKIP && out_rows > 1024) out_rows = 1024;
+                if (runtime_level == VX_COMPUTE_ATTN_ONLY && out_rows > 8192) out_rows = 8192;
+                if (runtime_level == VX_COMPUTE_SKIP && out_rows > 1024) out_rows = 1024;
                 if (out_rows > 0 && out_rows <= n_vocab * 2) {
                     apply_gemv(output_weight, x, logits, out_rows, out_cols, model->dequant_tmp);
                 }

@@ -161,11 +161,9 @@ int main(int argc, char **argv) {
     }
 
     if (profile.ctx_cap > 0 && model->config.n_ctx > profile.ctx_cap) {
-        model->config.n_ctx = profile.ctx_cap;
-        printf("  Applied context cap: %d\n", model->config.n_ctx);
+        printf("  Applied context cap: %d\n", profile.ctx_cap);
     }
-    vx_set_n_threads(profile.n_threads);
-    vx_set_compute_level(profile.compute_level);
+    vx_apply_runtime_profile(model, &profile);
     if (profile.compute_level != VX_COMPUTE_EXACT) {
         use_meta = false;
     }

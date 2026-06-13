@@ -3,6 +3,7 @@
 #include "tensor.h"
 #include "quantize.h"
 #include "platform.h"
+#include "runtime_profile.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -180,6 +181,23 @@ int main(void) {
            model->config.n_layers, model->config.n_embd, model->config.n_ff,
            model->config.n_vocab, model->config.n_heads, model->config.n_kv_heads);
     printf("Tensors loaded: %d\n", model->n_tensors);
+
+    vx_runtime_goal goal = {
+        .target_tok_s = 15.0f,
+        .quality_floor = 0.85f,
+        .ctx_limit = 256,
+    };
+    vx_device_profile device = vx_device_profile_auto();
+    vx_runtime_profile profile = vx_choose_runtime_profile(&model->config, &device, &goal);
+    vx_apply_runtime_profile(model, &profile);
+    printf("Runtime profile: %s (%s)\n", profile.name, profile.allow_run ? "allowed" : "blocked");
+    if (!profile.allow_run || !(model->config.n_ctx <= 256 && model->config.n_threads > 0)) {
+        printf("FAIL: runtime profile application\n");
+        vx_model_destroy(model);
+        remove(path);
+        return 1;
+    }
+
     int token = 5;
     float *logits = malloc((size_t)n_vocab * sizeof(float));
     if (!logits) { vx_model_destroy(model); remove(path); return 1; }
