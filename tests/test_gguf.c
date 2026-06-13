@@ -1,5 +1,6 @@
 #include "gguf.h"
 #include "model.h"
+#include "format.h"
 #include "tensor.h"
 #include "quantize.h"
 #include "metalearn.h"
@@ -168,6 +169,20 @@ static void test_scheduler(void) {
     TEST("compute_prediction_error", 1);
 }
 
+static void test_arch_aliases(void) {
+    printf("\n=== Architecture Aliases ===\n");
+
+    vx_model_config cfg;
+    memset(&cfg, 0, sizeof(cfg));
+
+    vx_model_apply_arch(&cfg, "qwen3.6");
+    TEST("arch qwen3.6 -> qwen family", cfg.arch == VX_ARCH_QWEN2 && cfg.mlp_type == VX_MLP_SWIGLU);
+
+    memset(&cfg, 0, sizeof(cfg));
+    vx_model_apply_arch(&cfg, "gemma4");
+    TEST("arch gemma4 -> gemma family", cfg.arch == VX_ARCH_GEMMA && cfg.mlp_type == VX_MLP_GEGLU);
+}
+
 extern int vx_test_runtime_profile(void);
 extern int vx_test_runtime_guard(void);
 
@@ -179,6 +194,7 @@ int main(void) {
     test_quantization();
     test_meta_predictor();
     test_scheduler();
+    test_arch_aliases();
     TEST("runtime_profile selection", vx_test_runtime_profile());
     TEST("runtime_guard throttling", vx_test_runtime_guard());
 

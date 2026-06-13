@@ -744,7 +744,10 @@ vx_error vx_tokenizer_load_gguf(const uint8_t *buf, size_t size, vx_tokenizer *t
     int is_bpe = (strcmp(model_type, "gpt2") == 0 || strcmp(model_type, "neox") == 0);
     int is_sp = (strcmp(model_type, "llama") == 0 || strcmp(model_type, "sentencepiece") == 0 ||
                  strcmp(model_type, "unigram") == 0);
-    bool use_tiktoken = (strstr(tokenizer_pre, "qwen2") != NULL) || (strstr(arch_str, "qwen2") != NULL);
+    bool use_tiktoken = (strstr(tokenizer_pre, "qwen2") != NULL) ||
+                        (strstr(tokenizer_pre, "qwen3") != NULL) ||
+                        (strstr(arch_str, "qwen2") != NULL) ||
+                        (strstr(arch_str, "qwen3") != NULL);
 
     if (is_bpe || (!is_sp && n_scores <= 0)) {
         // BPE tokenizer
